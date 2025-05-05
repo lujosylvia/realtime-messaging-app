@@ -8,6 +8,7 @@ import react from 'react';
 import { AuthProvider } from 'react-oidc-context';
 
 const queryClient = new QueryClient();
+// @ts-ignore
 Amplify.configure(config);
 
 export default function Providers({ children }: { children: react.ReactNode }) {
