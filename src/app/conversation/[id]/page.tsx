@@ -6,10 +6,9 @@ import Message from "../components/Message";
 import * as client from '../../../api/client';
 import { useQuery } from '@tanstack/react-query';
 import { ChangeEventHandler, use, useEffect, useMemo, useState } from "react";
-import { CreateCognitoUserInput, CreateMessageInput } from "@/api/API";
+import { CreateMessageInput } from "@/api/API";
 import { Card } from "@heroui/react";
 import { useAuth } from "react-oidc-context";
-import { randomUUID } from "crypto";
 import { events, EventsChannel } from "aws-amplify/api";
 
 interface ThreadPageProps {
@@ -26,28 +25,35 @@ export default function ThreadPage({ params }: ThreadPageProps) {
   const [newMessage, setNewMessage] = useState<string>('');
 
   const { data, isLoading: areMessagesLoading, refetch } = useQuery({
-    queryKey: [`messages-${id}`],
-    queryFn: () => client.fetchMessagesByThreadId(id),
+    queryKey: [`messages-${username}-${id}`],
+    queryFn: () => client.fetchMessagesByThreadId(id, auth.user?.id_token!),
+    enabled: !!auth.user?.id_token && !!username
   });
 
   const messages = data?.queryMessagesByIdThreadIndex?.items;
 
   useEffect(() => {
     const init = async () => {
-      const newChannel = await events.connect(`messages/${id}`);
-      newChannel.subscribe({
-        next: (data) => {
-          console.log('received', data);
-          refetch();
-        },
-        error: (err) => console.error('error', err),
-      });
+      try {
+        const newChannel = await events.connect(`messages/${id}`);
+        newChannel.subscribe({
+          next: (data) => {
+            console.log('received', data);
+            refetch();
+          },
+          error: (err) => console.warn('error', err),
+        });
 
       setChannel(newChannel)
+      } catch (err) {
+        console.warn('err setting up channel', err);
+      }
     }
 
-    init();
-  }, []);
+    if (auth.user?.id_token) {
+      init();
+    }
+  }, [auth.user?.id_token]);
 
   const onChangeMessage: ChangeEventHandler<HTMLInputElement> = (event) => {
     setNewMessage(event.target.value);
@@ -62,7 +68,9 @@ export default function ThreadPage({ params }: ThreadPageProps) {
     }
 
     try {
-      await events.post(`messages/${id}`, newMessageInput);
+      await events.post(`messages/${id}`, newMessageInput, {
+        authToken: auth.user?.id_token
+      });
       refetch();
     } catch (err) {
       console.log('send message error', err);
@@ -76,7 +84,7 @@ export default function ThreadPage({ params }: ThreadPageProps) {
   
   return (
     <>
-      <div className='flex flex-col h-[80%] gap-[1rem] px-3 overflow-y'>{
+      <div className='flex flex-col h-[90%] gap-[1rem] px-3 overflow-auto max-h-[90%]'>{
         messages?.map((message, index) => {
           if (!message) {
             return null;

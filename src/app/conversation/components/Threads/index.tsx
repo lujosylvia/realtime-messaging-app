@@ -3,19 +3,21 @@
 import { useQuery } from "@tanstack/react-query";
 import * as client from "../../../../api/client";
 import { useRouter } from 'next/navigation';
-import { Button, Card, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader, Select, SelectItem, useDisclosure } from "@heroui/react";
+import { Button, Card, useDisclosure } from "@heroui/react";
 import { Icon } from "@iconify/react/dist/iconify.js";
-import { CreateThreadInput } from "@/api/API";
-import { MouseEventHandler, useMemo, useState } from "react";
+import { MouseEventHandler, useMemo } from "react";
 import CreateThreadModal from "./CreateThreadModal";
-import { fetchThreads } from '../../../../api/client';
+import { useAuth } from "react-oidc-context";
 
 
 export default function Threads() {
   const router = useRouter();
-  const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['threads'],
-    queryFn: client.fetchThreads,
+  const auth = useAuth();
+  const username = useMemo(() => auth.user?.profile?.['cognito:username'], [auth])
+  const { data, refetch } = useQuery({
+    queryKey: [`threads-${username}`],
+    queryFn: () => client.fetchThreads(auth?.user?.id_token!),
+    enabled: !!auth.user?.id_token && !!username
   });
   const {isOpen, onOpen, onOpenChange} = useDisclosure();
   const threads = useMemo(() => data?.listThreads?.items, [data]);
@@ -27,8 +29,6 @@ export default function Threads() {
   const onSelectThread = (threadId: string): MouseEventHandler<HTMLDivElement> => () => {
     router.push(`/conversation/${threadId}`);
   }
-
-
 
   return (
     <div className="flex flex-col">

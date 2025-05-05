@@ -19,7 +19,8 @@ export default function CreateThreadModal({ isOpen, onOpenChange, onSuccess }: R
   const username = useMemo(() => auth?.user?.profile?.['cognito:username'], [auth]);
   const { data: usersData } = useQuery({
     queryKey: ['users'],
-    queryFn: () => client.fetchUsers()
+    queryFn: () => client.fetchUsers(auth.user?.id_token!),
+    enabled: !!auth.user?.id_token && !!username
   })
 
   const [createThreadForm, setCreateThreadForm] = useState<{ participants: string[], firstMessage: string}>({ participants: [], firstMessage: '' });
@@ -60,7 +61,7 @@ export default function CreateThreadModal({ isOpen, onOpenChange, onSuccess }: R
     }
 
     try {
-      const threadResponse = await client.postThread(createThreadInput);
+      const threadResponse = await client.postThread(createThreadInput, auth.user?.id_token!);
 
       const createMessageInput: CreateMessageInput = {
         content: createThreadForm.firstMessage,
@@ -68,7 +69,7 @@ export default function CreateThreadModal({ isOpen, onOpenChange, onSuccess }: R
         thread: threadResponse.createThread?.id!,
         sendTime: new Date().toISOString(),
       }
-      const messageResponse = await client.postMessage(createMessageInput)
+      const messageResponse = await client.postMessage(createMessageInput, auth.user?.id_token!)
 
       onSuccess && onSuccess();
     } catch (err) {
